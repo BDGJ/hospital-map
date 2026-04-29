@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Map - ศูนย์การแพทย์กาญจนาภิเษก</title>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Prompt', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh; 
+        }
+
+        .scroll-wrapper {
+            width: 100vw;
+            height: 100vh;
+            overflow: auto; 
+        }
+
+        .map-container {
+            position: relative;
+            min-width: 1200px; /* ล็อคขนาดไม่ให้ปุ่มเบี้ยว */
+            margin: 0 auto;
+        }
+
+        .map-image {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .hotspot {
+            position: absolute;
+            width: 30px;       /* 👈 ลดขนาดความกว้างลง (เดิม 50px) */
+            height: 30px;      /* 👈 ลดขนาดความสูงลง (เดิม 50px) */
+            border: 3px solid #fff;
+            border-radius: 50%; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 16px;   /* 👈 ลดขนาดตัวเลขข้างในให้พอดีกับปุ่ม (เดิม 24px) */
+            font-weight: bold;
+            color: #fff;
+            cursor: pointer;
+            transition: transform 0.2s, background-color 0.2s; 
+            z-index: 10; 
+            background-color: rgba(0, 86, 179, 0.8);
+        }
+
+
+        /* 📍 ตำแหน่งของตึกทั้ง 6 (ปรับตัวเลข top และ left ตรงนี้เลยครับ) */
+        #hotspot-1 { top: 64%; left: 15%; }
+        #hotspot-2 { top: 60%; left: 25%; }
+        #hotspot-3 { top: 50%; left: 50%; }
+        #hotspot-4 { top: 37%; left: 68%; }
+        #hotspot-5 { top: 24%; left: 88%; }
+        #hotspot-6 { top: 22%; left: 85%; }
+	#hotspot-7 { top: 15%; left: 86%; }
+
+
+        .hotspot:hover {
+            transform: scale(1.1); 
+            background-color: rgba(255, 255, 255, 1);
+            color: #333;
+        }
+
+/* -----------------------------------------
+           ตั้งค่าป้ายชื่อสถานที่ (โชว์ค้างไว้ตลอด)
+        ----------------------------------------- */
+        .location-sign {
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.9); /* พื้นหลังสีขาวโปร่งแสงนิดๆ */
+            color: #333;
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-size: 22px;
+            font-weight: bold;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            border-left: 5px solid #0056b3; /* แถบสีน้ำเงินด้านซ้ายให้ดูมีมิติ */
+            z-index: 8; /* ให้อยู่ใต้ป๊อปอัป แต่ลอยอยู่บนแผนที่ */
+            pointer-events: none; /* เพื่อไม่ให้ตัวป้ายไปบังการกดปุ่มตึกอื่นๆ */
+        }
+
+        /* 📍 ตำแหน่งของป้ายที่ 1 และ 2 */
+        #sign-1 { top: 20%; left: 25%; }
+        #sign-2 { top: 75%; left: 70%; }
+
+
+        /* กล่องป๊อปอัปชื่อตึก */
+        .building-popup {
+            position: absolute;
+            /* (ลบ top, left, transform ออกไปแล้ว) */
+            width: 250px; 
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            text-align: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s;
+            pointer-events: none; 
+            z-index: 5;
+
+	/* 👇 เพิ่มโค้ดพวกนี้เข้าไปเพื่อกันล้น */
+            max-width: 200px; /* บังคับให้กล่องไม่กว้างเกินไป (ถ้าจอมือถือเล็ก) */
+            white-space: normal; /* สั่งให้ข้อความยาวๆ ตกมาขึ้นบรรทัดใหม่ */
+            text-align: center; /* จัดกึ่งกลางให้อ่านง่าย */
+            z-index: 9999; /* ดันป๊อปอัปให้ลอยอยู่บนสุด จะได้ไม่โดนรูปอื่นบัง */
+       
+        }
+
+        .building-popup h2 {
+            margin: 0;
+            color: #0056b3;
+            font-size: 28px;
+            border-bottom: 2px solid #0056b3;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+
+        .show-popup {
+            opacity: 1;
+            visibility: visible;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="scroll-wrapper">
+
+        <div class="map-container">
+            
+            <img src="my-map001.jpg" alt="แผนที่" class="map-image">
+        
+        <div class="hotspot" id="hotspot-1">1</div>
+        <div class="hotspot" id="hotspot-2">2</div>
+        <div class="hotspot" id="hotspot-3">3</div>
+        <div class="hotspot" id="hotspot-4">4</div>
+        <div class="hotspot" id="hotspot-5">5</div>
+        <div class="hotspot" id="hotspot-6">6</div>
+	<div class="hotspot" id="hotspot-7">7</div>
+	<div class="location-sign" id="sign-1">สวนพุทธมณฑล</div>
+        <div class="location-sign" id="sign-2">มหาวิทยาลัยมหิดล</div>
+
+        <div class="building-popup" id="buildingPopup">
+            <h2 id="popupName">Building Name</h2>
+            <p><i>(คลิกเพื่อดูรายละเอียดเพิ่มเติม)</i></p>
+        </div>
+
+    </div>
+
+    <script>
+        const popup = document.getElementById('buildingPopup');
+        const popupName = document.getElementById('popupName');
+
+        function setupHotspot(hotspotId, buildingName, targetUrl) {
+            const hotspot = document.getElementById(hotspotId);
+
+            hotspot.addEventListener('mouseenter', () => {
+                popupName.textContent = buildingName;
+                
+                const btnPos = hotspot.getBoundingClientRect(); 
+                
+                // 1. ตั้งค่าตำแหน่งเริ่มต้น (โผล่ด้านขวาของปุ่ม)
+                let popLeft = btnPos.left + 40; 
+                let popTop = btnPos.top - 20;   
+
+                // 2. เช็คขอบจอขวา: ถ้าตำแหน่ง + ความกว้างกล่อง มันเกินขนาดหน้าจอ
+                if (popLeft + popup.offsetWidth > window.innerWidth) {
+                    // ให้ย้ายมาโผล่ด้านซ้ายของปุ่มแทน
+                    popLeft = btnPos.left - popup.offsetWidth - 15; 
+                }
+
+                // 3. เช็คขอบจอล่าง: ถ้ากล่องทะลุด้านล่าง
+                if (popTop + popup.offsetHeight > window.innerHeight) {
+                    // ให้ดันกล่องขึ้นมาไม่ให้เกินขอบล่าง
+                    popTop = window.innerHeight - popup.offsetHeight - 15; 
+                }
+
+                // 4. เช็คขอบจอบน: (เผื่อไว้) ถ้ากล่องทะลุด้านบน
+                if (popTop < 0) {
+                    popTop = 15; // ดันลงมานิดนึง
+                }
+
+                // นำตำแหน่งที่คำนวณเสร็จแล้วไปใช้งานจริง
+                popup.style.left = popLeft + 'px';
+                popup.style.top = popTop + 'px';
+
+                // โชว์ป๊อปอัป
+                popup.classList.add('show-popup');
+            });
+
+            hotspot.addEventListener('mouseleave', () => {
+                popup.classList.remove('show-popup');
+            });
+
+            hotspot.addEventListener('click', () => {
+                window.location.href = targetUrl;
+            });
+        }
+
+        // 📝 ตั้งค่าชื่อตึก และ ไฟล์ที่จะให้ลิงก์ไปตอนคลิก
+        setupHotspot('hotspot-1', 'กาญจนาบริพัฒน์', 'building-1.html');
+        setupHotspot('hotspot-2', 'อาคารจอดรถ', 'building-2.html');
+        setupHotspot('hotspot-3', 'ศูนย์การแพทย์กาญจนาภิเษก', 'building-3.html');
+        setupHotspot('hotspot-4', 'กาญจนาปัญรักษ์', 'building-4.html');
+        setupHotspot('hotspot-5', 'หอพักกันภัย', 'building-5.html');
+        setupHotspot('hotspot-6', 'หอพักคุ้มภัย', 'building-6.html');
+	setupHotspot('hotspot-7', 'งานอาคารสถานที่ฯ', 'building-7.html');
+
+    </script>
+
+</body>
+</html>
